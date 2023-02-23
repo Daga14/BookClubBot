@@ -9,29 +9,58 @@ const colors = require('../colors.json');
 
 async function scrapeData(link) {
 	try {
-	// Fetch HTML of the page we want to scrape
 		const { data } = await axios.get(link);
-		// Load HTML we fetched in the previous line
 		const $ = cheerio.load(data, { xmlMode: true });
 		const bookCover = $('.BookCover__image').find($('.ResponsiveImage')).attr('src');
-		const authorName = $('span[class="ContributorLink__name"]').first().text();
-		const rating = $('.RatingStatistics__rating').first().text();
-		const authorLink = $('.ContributorLink').attr('href');
-		const pagesString = $('p[data-testid="pagesFormat"]').first().text();
+
+		let authorName = 'Author Name';
+		const contributorName = $('span[class="ContributorLink__name"]').first().text();
+		if (contributorName != undefined && contributorName != '') {
+			authorName = contributorName;
+		}
+
+		let rating = '0.0';
+		const ratingStatistics = $('.RatingStatistics__rating').first().text();
+		if (ratingStatistics != undefined && ratingStatistics != '') {
+			rating = ratingStatistics;
+		}
+
+		let authorLink = 'Author Link';
+		const contributorLink = $('.ContributorLink').attr('href');
+		if (contributorLink != undefined && contributorLink != '') {
+			authorLink = contributorLink;
+		}
+
+		let pagesString = '0 pages, Empty';
+		const pagesFormat = $('p[data-testid="pagesFormat"]').first().text();
+		if (pagesFormat != undefined && pagesFormat != '') {
+			pagesString = pagesFormat;
+		}
 		const pagesArray = pagesString.split(',');
 		const pages = pagesArray[0];
-		const publicationInfo = $('p[data-testid="publicationInfo"]').first().text();
-		let description = $('.BookPageMetadataSection__description').find('span[class="Formatted"]').first().html();
-		description = htmlToText(description, { wordwrap: false });
+
+		let publicationInfo = 'Never published';
+		const publicationHtml = $('p[data-testid="publicationInfo"]').first().text();
+		if (publicationHtml != undefined && publicationHtml != '') {
+			publicationInfo = publicationHtml;
+		}
+
+		let description = 'This is a generic description';
+		let metadataSectionDescription = $('.BookPageMetadataSection__description').find('span[class="Formatted"]').first().html();
+		metadataSectionDescription = htmlToText(metadataSectionDescription, { wordwrap: false });
+		if (metadataSectionDescription != undefined && metadataSectionDescription != '') {
+			description = metadataSectionDescription;
+		}
+
 		let genres = 'Goodreads doesn\'t care enough for this book\'s genres.';
-		let cont = 0;
+		let firstGenreFlag = true;
 		let firstGenre = '';
 		$('.BookPageMetadataSection__genres').find('span[class="Button__labelItem"]').each(function() {
 			const genreText = $(this).text();
 			if (genreText) {
-				if (cont == 0) {
+				if (firstGenreFlag) {
 					genres = '';
-					cont += 1;
+					firstGenreFlag = false;
 					firstGenre = genreText;
 				}
 				if (genres == '') {
@@ -46,8 +75,16 @@ async function scrapeData(link) {
 		if (color == undefined) {
 			color = 0xF44336;
 		}
-		const bookName = $('h1[class="Text Text__title1"]').text();
-		const authorPhoto = $('.PageSection').find($('img[class="Avatar__image"]')).attr('src');
+		let bookName = 'Book Name';
+		const textTitle1 = $('h1[class="Text Text__title1"]').text();
+		if (textTitle1 != undefined && textTitle1 != '') {
+			bookName = textTitle1;
+		}
+		let authorPhoto = 'http://false.com';
+		const avatarImage = $('.PageSection').find($('img[class="Avatar__image"]')).attr('src');
+		if (avatarImage != undefined && avatarImage != '') {
+			authorPhoto = avatarImage;
+		}
 		const exampleEmbed = new EmbedBuilder()
 			.setColor(color)
 			.setTitle(bookName)
@@ -92,7 +129,6 @@ module.exports = {
 		let bookLink = '';
 		for (let i = 0; i < items.length; i++) {
 			const link = items[i].link;
-			console.log(link);
 			if (link.includes('https://www.goodreads.com/book/show/')) {
 				i = items.length;
 				bookLink = link;
@@ -112,7 +148,7 @@ module.exports = {
 			}
 		}
 		else {
-			await interaction.editReply('Good Job! Even Google can\'t find this book on goodreads');
+			await interaction.editReply('I don\'t understand that reference');
 		}
 	},
 };
