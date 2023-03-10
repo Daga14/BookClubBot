@@ -104,6 +104,78 @@ async function scrapeData(link) {
 	}
 }
 
+
+async function getISBN13(isbn10) {
+	let total = 0;
+	const bookLand = '978';
+	let isbn12 = bookLand + isbn10;
+	isbn12 = isbn12.slice(0, -1);
+	for (let i = 0; i < isbn12.length; i++) {
+		let digit = isbn12[i];
+		if (digit.toUpperCase == 'X') {
+			digit = '10';
+		}
+		// Odd
+		if (i & 1) {
+			total += parseInt(digit) * 3;
+		}
+		else {
+			total += parseInt(digit) * 1;
+		}
+	}
+
+	let checkDigit = total % 10;
+	if (checkDigit != 0) {
+		checkDigit = 10 - checkDigit;
+
+	}
+	console.log(checkDigit);
+	const isbn13 = isbn12 + checkDigit;
+
+	return isbn13;
+
+}
+
+async function getGRedition(link, isbn) {
+	try {
+		const { data } = await axios.get(link);
+		const $ = cheerio.load(data, { xmlMode: true });
+		const isbnType = isbn.length;
+		let specificBookLink = '';
+		const editionData = $('.editionData').map(function() {
+			return {
+				isbns: $(this).find('.dataValue:eq(2)').text().trim(),
+				bookTitleLink: $(this).find('.bookTitle').attr('href'),
+			};
+		}).toArray();
+
+		for (let i = 0; i < editionData.length; i++) {
+			console.log(editionData[i].isbns);
+			if (i == 0) {
+				specificBookLink = editionData[i].bookTitleLink;
+			}
+			if (isbn == editionData[i].isbns) {
+				specificBookLink = editionData[i].bookTitleLink;
+			}
+			else if (isbnType == 13) {
+				const isbn13 = await getISBN13(editionData[i].isbns);
+				console.log(isbn13);
+				if (isbn == isbn13) {
+					specificBookLink = editionData[i].bookTitleLink;
+				}
+
+			}
+
+		}
+		console.log(specificBookLink);
+		return specificBookLink;
+
+	}
+	catch (err) {
+		console.error(err);
+	}
+}
+
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('gr')
@@ -111,11 +183,16 @@ module.exports = {
 		.addStringOption(option =>
 			option.setName('book_name')
 				.setRequired(true)
-				.setDescription('Name of the book to search')),
+				.setDescription('Name of the book to search'))
+		.addStringOption(option =>
+			option.setName('isbn')
+				.setRequired(false)
+				.setDescription('ISBN code')),
 	async execute(interaction) {
 		await interaction.deferReply();
 		const customsearch = google.customsearch('v1');
 		const q = interaction.options.getString('book_name');
+		const isbn = interaction.options.getString('isbn');
 		const res = await customsearch.cse.list({
 			cx: cseKey,
 			q: q,
@@ -127,12 +204,29 @@ module.exports = {
 		}
 		const items = res.data.items;
 		let bookLink = '';
+		let editionsLink = '';
 		for (let i = 0; i < items.length; i++) {
 			const link = items[i].link;
-			if (link.includes('https://www.goodreads.com/book/show/')) {
+			console.log(link);
+			if (isbn) {
+				if (i == 0) {
+					bookLink = link;
+				}
+				if (link.includes('https://www.goodreads.com/work/editions/')) {
+					i = items.length;
+					editionsLink = link;
+				}
+			}
+			else if (link.includes('https://www.goodreads.com/book/show/')) {
 				i = items.length;
 				bookLink = link;
 			}
+		}
+
+		if (editionsLink != '') {
+			const grLink = await getGRedition(editionsLink, isbn);
+			bookLink = 'https://www.goodreads.com' + grLink;
+			console.log(bookLink);
 		}
 
 		if (bookLink != '') {
