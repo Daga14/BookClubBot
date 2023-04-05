@@ -1,8 +1,7 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { google } = require('googleapis');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { EmbedBuilder } = require('discord.js');
 const { htmlToText } = require('html-to-text');
 const { apiKey, cseKey } = require('../config.json');
 const colors = require('../colors.json');
@@ -11,26 +10,32 @@ async function scrapeData(link) {
 	try {
 		const { data } = await axios.get(link);
 		const $ = cheerio.load(data, { xmlMode: true });
-		const bookCover = $('.BookCover__image').find($('.ResponsiveImage')).attr('src');
 
+		// Author Name
 		let authorName = 'Author Name';
 		const contributorName = $('span[class="ContributorLink__name"]').first().text();
 		if (contributorName != undefined && contributorName != '') {
 			authorName = contributorName;
 		}
 
+		// Book Cover
+		const bookCover = $('.BookCover__image').find($('.ResponsiveImage')).attr('src');
+
+		// Rating
 		let rating = '0.0';
 		const ratingStatistics = $('.RatingStatistics__rating').first().text();
 		if (ratingStatistics != undefined && ratingStatistics != '') {
 			rating = ratingStatistics;
 		}
 
-		let authorLink = 'Author Link';
+		// Author Link
+		let authorLink = 'https://www.AuthorLink.com';
 		const contributorLink = $('.ContributorLink').attr('href');
 		if (contributorLink != undefined && contributorLink != '') {
 			authorLink = contributorLink;
 		}
 
+		// Pages
 		let pagesString = '0 pages, Empty';
 		const pagesFormat = $('p[data-testid="pagesFormat"]').first().text();
 		if (pagesFormat != undefined && pagesFormat != '') {
@@ -39,12 +44,14 @@ async function scrapeData(link) {
 		const pagesArray = pagesString.split(',');
 		const pages = pagesArray[0];
 
+		// Publication Info
 		let publicationInfo = 'Never published';
 		const publicationHtml = $('p[data-testid="publicationInfo"]').first().text();
 		if (publicationHtml != undefined && publicationHtml != '') {
 			publicationInfo = publicationHtml;
 		}
 
+		// Description
 		let description = 'This is a generic description';
 		let metadataSectionDescription = $('.BookPageMetadataSection__description').find('span[class="Formatted"]').first().html();
 		metadataSectionDescription = htmlToText(metadataSectionDescription, { wordwrap: false });
@@ -52,6 +59,7 @@ async function scrapeData(link) {
 			description = metadataSectionDescription;
 		}
 
+		// Genres
 		let genres = 'Goodreads doesn\'t care enough for this book\'s genres.';
 		let firstGenreFlag = true;
 		let firstGenre = '';
@@ -71,20 +79,28 @@ async function scrapeData(link) {
 				}
 			}
 		});
-		let color = colors[firstGenre];
+
+		// Color
+		let color = colors[firstGenre.toLowerCase()];
 		if (color == undefined) {
 			color = 0xF44336;
 		}
+
+		// Book Name
 		let bookName = 'Book Name';
 		const textTitle1 = $('h1[class="Text Text__title1"]').text();
 		if (textTitle1 != undefined && textTitle1 != '') {
 			bookName = textTitle1;
 		}
+
+		// Author Photo
 		let authorPhoto = 'http://false.com';
 		const avatarImage = $('.PageSection').find($('img[class="Avatar__image"]')).attr('src');
 		if (avatarImage != undefined && avatarImage != '') {
 			authorPhoto = avatarImage;
 		}
+
+		// Creating Embed
 		const exampleEmbed = new EmbedBuilder()
 			.setColor(color)
 			.setTitle(bookName)
@@ -96,6 +112,7 @@ async function scrapeData(link) {
 		exampleEmbed.addFields({ name: '⭐ Avg. Rating', value: rating, inline:true });
 		exampleEmbed.addFields({ name: '📄 Pages', value: pages, inline:true });
 		exampleEmbed.addFields({ name: '➡️ Genres', value: genres });
+
 
 		return exampleEmbed;
 	}
@@ -115,7 +132,6 @@ async function getISBN13(isbn10) {
 		if (digit.toUpperCase == 'X') {
 			digit = '10';
 		}
-		// Odd
 		if (i & 1) {
 			total += parseInt(digit) * 3;
 		}
@@ -150,7 +166,6 @@ async function getGRedition(link, isbn) {
 		}).toArray();
 
 		for (let i = 0; i < editionData.length; i++) {
-			console.log(editionData[i].isbns);
 			if (i == 0) {
 				specificBookLink = editionData[i].bookTitleLink;
 			}
@@ -159,15 +174,12 @@ async function getGRedition(link, isbn) {
 			}
 			else if (isbnType == 13) {
 				const isbn13 = await getISBN13(editionData[i].isbns);
-				console.log(isbn13);
 				if (isbn == isbn13) {
 					specificBookLink = editionData[i].bookTitleLink;
 				}
-
 			}
 
 		}
-		console.log(specificBookLink);
 		return specificBookLink;
 
 	}
@@ -226,7 +238,6 @@ module.exports = {
 		if (editionsLink != '') {
 			const grLink = await getGRedition(editionsLink, isbn);
 			bookLink = 'https://www.goodreads.com' + grLink;
-			console.log(bookLink);
 		}
 
 		if (bookLink != '') {
