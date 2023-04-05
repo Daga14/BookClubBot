@@ -3,7 +3,6 @@
 ##### New Features
 
 *  New command /sg to search books on StoryGraph. (bad77746)
-*  Added optional field 'isbn' to /gr command, it can be isbn10 or isbn13, and in case of not finding that edition it would default to the main one. (0cf7ac2c)
 
 ##### Bug Fixes
 
